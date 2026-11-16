@@ -11,7 +11,7 @@
 #   mnmv update   # baixa de novo o código do MNMV (ex.: depois de trocar MNMV_REF)
 set -eu
 
-MNMV_REPO="${MNMV_REPO:-SEU_USUARIO/mnmv}"
+MNMV_REPO="${MNMV_REPO:-andreyev/mnmv}"
 MNMV_REF="${MNMV_REF:-main}"   # branch ou tag (ex.: v0.1.0)
 MNMV_SOURCE="${MNMV_SOURCE:-https://github.com/${MNMV_REPO}/archive/${MNMV_REF}.tar.gz//*}"
 REGISTRY_NAME="${REGISTRY_NAME:-mnmv-registry}"

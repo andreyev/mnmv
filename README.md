@@ -17,7 +17,7 @@ no primeiro uso. O state fica em `.mnmv/terraform.tfstate`. Adicione `.mnmv/` ao
 ## Instalação
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/SEU_USUARIO/mnmv/main/mnmv -o ~/.local/bin/mnmv
+curl -fsSL https://raw.githubusercontent.com/andreyev/mnmv/main/mnmv -o ~/.local/bin/mnmv
 chmod +x ~/.local/bin/mnmv
 ```
 
