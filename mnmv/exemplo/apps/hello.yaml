@@ -1,0 +1,3 @@
+# Tudo o que o usuário precisa escrever.
+# O caminho é relativo a este arquivo (igual ao docker compose).
+build: ../hello

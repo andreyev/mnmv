@@ -1,0 +1,4 @@
+# Ambiente alvo da POC.
+# Convenções: provider = k3s, domain = localhost (http://<app>.localhost)
+provider: k3s
+domain: localhost

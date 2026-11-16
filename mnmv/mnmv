@@ -1,0 +1,75 @@
+#!/usr/bin/env sh
+# mnmv — Minha Nuvem, Minha Vida
+#
+# Roda no diretório do seu projeto (cloud.yaml + apps/). O código OpenTofu
+# não fica no projeto: é baixado do GitHub via HTTPS para .mnmv/code.
+#
+#   mnmv setup    # uma vez: registry local + k3s puxando dele + kubeconfig
+#   mnmv up       # builda, publica e faz deploy dos apps
+#   mnmv plan     # mostra o que mudaria
+#   mnmv down     # remove tudo do cluster
+#   mnmv update   # baixa de novo o código do MNMV (ex.: depois de trocar MNMV_REF)
+set -eu
+
+MNMV_REPO="${MNMV_REPO:-SEU_USUARIO/mnmv}"
+MNMV_REF="${MNMV_REF:-main}"   # branch ou tag (ex.: v0.1.0)
+MNMV_SOURCE="${MNMV_SOURCE:-https://github.com/${MNMV_REPO}/archive/${MNMV_REF}.tar.gz//*}"
+REGISTRY_NAME="${REGISTRY_NAME:-mnmv-registry}"
+REGISTRY_PORT="${REGISTRY_PORT:-5000}"
+
+PROJECT_DIR="$(pwd)"
+WORK="$PROJECT_DIR/.mnmv"
+CODE="$WORK/code"
+STATE="$WORK/terraform.tfstate"
+KUBECONFIG_FILE="$WORK/kubeconfig"
+
+die() { echo "mnmv: $*" >&2; exit 1; }
+
+[ -f "$PROJECT_DIR/cloud.yaml" ] || die "cloud.yaml não encontrado em $PROJECT_DIR"
+command -v tofu >/dev/null || die "OpenTofu (tofu) não encontrado no PATH"
+mkdir -p "$WORK"
+
+fetch() {
+  if [ ! -f "$CODE/main.tf" ] || [ "$(cat "$WORK/source" 2>/dev/null)" != "$MNMV_SOURCE" ]; then
+    echo "mnmv: baixando código de $MNMV_SOURCE"
+    rm -rf "$CODE" && mkdir -p "$CODE"
+    tofu -chdir="$CODE" init -input=false \
+      -from-module="$MNMV_SOURCE" \
+      -backend-config="path=$STATE"
+    echo "$MNMV_SOURCE" > "$WORK/source"
+  fi
+}
+
+tofu_run() {
+  [ -f "$KUBECONFIG_FILE" ] || die "kubeconfig não encontrado; rode 'mnmv setup' primeiro"
+  fetch
+  tofu -chdir="$CODE" "$@" \
+    -var "project_dir=$PROJECT_DIR" \
+    -var "kubeconfig=$KUBECONFIG_FILE" \
+    -var "registry=localhost:$REGISTRY_PORT"
+}
+
+setup() {
+  docker inspect "$REGISTRY_NAME" >/dev/null 2>&1 || \
+    docker run -d --restart=always -p "$REGISTRY_PORT:5000" --name "$REGISTRY_NAME" registry:2
+
+  regs=/etc/rancher/k3s/registries.yaml
+  if ! sudo grep -q "localhost:$REGISTRY_PORT" "$regs" 2>/dev/null; then
+    printf 'mirrors:\n  "localhost:%s":\n    endpoint:\n      - "http://localhost:%s"\n' \
+      "$REGISTRY_PORT" "$REGISTRY_PORT" | sudo tee "$regs" >/dev/null
+    sudo systemctl restart k3s
+  fi
+
+  sudo cat /etc/rancher/k3s/k3s.yaml > "$KUBECONFIG_FILE"
+  chmod 600 "$KUBECONFIG_FILE"
+  echo "mnmv: setup concluído"
+}
+
+case "${1:-}" in
+  setup)  setup ;;
+  up)     tofu_run apply ;;
+  plan)   tofu_run plan ;;
+  down)   tofu_run destroy ;;
+  update) rm -f "$WORK/source"; fetch ;;
+  *)      sed -n '2,13p' "$0"; exit 1 ;;
+esac
