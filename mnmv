@@ -50,11 +50,18 @@ tofu_run() {
 }
 
 setup() {
+  command -v docker >/dev/null || die "Docker não encontrado no PATH"
+  if ! command -v k3s >/dev/null; then
+    die "k3s não encontrado. Instale com: curl -sfL https://get.k3s.io | sh -"
+  fi
+  systemctl is-active --quiet k3s || die "serviço k3s não está ativo (systemctl status k3s)"
+
   docker inspect "$REGISTRY_NAME" >/dev/null 2>&1 || \
     docker run -d --restart=always -p "$REGISTRY_PORT:5000" --name "$REGISTRY_NAME" registry:2
 
   regs=/etc/rancher/k3s/registries.yaml
   if ! sudo grep -q "localhost:$REGISTRY_PORT" "$regs" 2>/dev/null; then
+    sudo mkdir -p "$(dirname "$regs")"
     printf 'mirrors:\n  "localhost:%s":\n    endpoint:\n      - "http://localhost:%s"\n' \
       "$REGISTRY_PORT" "$REGISTRY_PORT" | sudo tee "$regs" >/dev/null
     sudo systemctl restart k3s
